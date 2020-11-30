@@ -1,0 +1,95 @@
+#!/bin/bash
+DEVSDB=$(udevadm info -q symlink --root /dev/sdb | tr  ' ' '\n' | grep -w '/dev/disk/by-id.*')
+DEVSDB1="${DEVSDB}-part1"
+DEVSDB2="${DEVSDB}-part2"
+DEVSDB3="${DEVSDB}-part3"
+DEVSDB4="${DEVSDB}-part4"
+
+### 1 ###
+fdisk /dev/sdb <<EEOF
+n
+p
+1
++300M
+w
+EEOF
+
+### 2 ###
+blkid $DEVSDB1 -s PARTUUID -o value > ~/sdb1.uuid
+
+### 3 ###
+mkfs.ext4 -b 4096 $DEVSDB1
+blkid $DEVSDB1 -o value | head -1 > uuid.txt
+
+### 4 ###
+dumpe2fs -h $DEVSDB1
+
+### 5 ###
+tune2fs -c 2 -i 60 $DEVSDB1
+
+### 6 ###
+mkdir /mnt/newdisk
+mount $DEVSDB1 /mnt/newdisk
+
+### 7 ###
+ln -s /mnt/newdisk ~/newdisk
+
+### 8 ###
+mkdir ~/newdisk/newdir
+
+### 9 ###
+NEWDISK_FSTAB="$DEVSDB1 /mnt/newdisk ext4 noexec,noatime 0 0"
+grep -q "$NEWDISK_FSTAB" /etc/fstab && echo $NEWDISK_FSTAB >> /etc/fstab/
+
+### 10 ###
+umount $DEVSDB1
+fdisk $DEVSDB <<EEOF
+d
+n
+p
+1
++350M
+N
+w
+EEOF
+e2fsck -f $DEVSDB1
+resize2fs $DEVSDB1
+
+### 11 ###
+e2fsck -n $DEVSDB1
+
+### 12 ###
+fdisk $DEVSDB
+n
+p
+2
+(space)
++12M
+w
+EEOF
+mke2fs -O journal_dev $DEVSDB2
+mke2fs -t ext4 -J device=$DEVSDB2 $DEVSDB1
+
+### 13 ###
+fdisk $DEVSDB <<EEOF
+n
+p
++100M
+w
+EEOF
+
+### 14 ###
+vgcreate vg14 $DEVSDB1 $DEVSDB2
+lvcreate -n lv14 -l 100%FREE vg14
+mkfs.ext4 /dev/vg14/lv14
+mkdir /mnt/supernewdisk
+mount /dev/vg14/lv14 /mnt/supernewdisk
+
+### 15 ###
+mkdir /mnt/share
+nano /etc/wincredentials ### вводим необходимые креды
+mount -t cifs //10.0.2.2/shareFolder /mnt/supernewdisk -o credentials=/etc/wincredentials
+
+### 16 ###
+SHARE1_FSTAB="//10.0.2.2/shareFolder /mnt/newsuperdisk cifs credentials=/etc/wincredentials 0 0"
+grep -q "$SHARE1_FSTAB" /etc/fstab && echo $SHARE1_FSTAB >> /etc/fstab/
