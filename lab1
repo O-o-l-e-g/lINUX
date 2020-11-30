@@ -1,0 +1,65 @@
+#!/bin/sh
+
+TEST=~/test
+LIST=$TEST/list
+LIST1=$TEST/list1
+LINKS=$TEST/links
+LIST_HLINK=$LINKS/list_hlink
+LIST_SLINK=$LINKS/list_slink
+LIST_HLINK2=~/list_hlink2
+LIST_CONF=~/list_conf
+LIST_D=~/list_d
+LIST_CONF_D=~/list_conf_d
+SUB=$TEST/.sub
+MAN1=~/man.txt
+MAN_DIR=$TEST/man.dir
+MAN2=$MAN_DIR/man.txt
+PATCH_DIFF=$MAN_DIR/patch.diff
+
+MAN_SPLITTED_SUFFIX=_man_splitted
+
+mkdir --parent $TEST # better use if
+
+ls /etc --almost-all --indicator-style=slash > $LIST
+ls /etc/*/ --directory | wc --lines >> $LIST # use find here
+ls --almost-all /etc/ | grep '^\.' --count >> $LIST # also use find
+
+mkdir --parent $LINKS
+
+ln --force $LIST $LIST_HLINK
+ln --force --symbolic $LIST $LIST_SLINK
+echo list_hlink: $(ls -l $LIST_HLINK | awk '{print $2}')
+echo list: $(ls -l $LIST | awk '{print $2}')
+echo list_slink: $(ls -l $LIST_SLINK | awk '{print $2}')
+read
+
+cat $LIST | wc --lines >> $LIST_HLINK # wc can use file
+diff $LIST_HLINK $LIST_SLINK && echo YES
+read
+
+mv --force $LIST $LIST1
+diff $LIST_HLINK $LIST_SLINK && echo YES
+read
+
+ln --force $LIST $LIST_HLINK2
+find /etc -name "*.conf" -type f > $LIST_CONF
+find /etc -name "*.d" -type d > $LIST_D
+cat $LIST_CONF $LIST_D > $LIST_CONF_D
+mkdir --parent $SUB
+cp $LIST_CONF_D $SUB
+cp -b $LIST_CONF_D $SUB
+
+man man > $MAN1
+split --bytes=1K --additional-suffix=$MAN_SPLITTED_SUFFIX $MAN1
+mkdir --parent $MAN_DIR
+mv ~/*"${MAN_SPLITTED_SUFFIX}" $MAN_DIR
+cat $MAN_DIR/*"${MAN_SPLITTED_SUFFIX}" > $MAN2
+diff $MAN1 $MAN2 && echo YES
+read
+
+echo -e "new-line1\nnew-line2\n$(cat $MAN1)" > $MAN1
+echo -e "\nnew-line3\nnew-line4" >> $MAN1
+diff -u $MAN1 $MAN2 > $PATCH_DIFF
+patch $MAN2 < $PATCH_DIFF
+diff $MAN1 $MAN2 && echo YES
+read
