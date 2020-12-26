@@ -1,5 +1,6 @@
 #!/bin/sh
 
+# Создание переменных
 TEST=~/test
 LIST=$TEST/list
 LIST1=$TEST/list1
@@ -18,48 +19,90 @@ PATCH_DIFF=$MAN_DIR/patch.diff
 
 MAN_SPLITTED_SUFFIX=_man_splitted
 
-mkdir --parent $TEST # better use if
+# Создать каталог test в домашнем каталоге пользователя.
+mkdir --parent $TEST 
 
+# Создать в нем файл list, содержащий список всех файлов и поддиректориев каталога /etc (включая скрытые) в таком виде, что можно однозначно определить какая из записей является именем файла, а какая — названием директории.
 ls /etc --almost-all --indicator-style=slash > $LIST
+
+# Вывести в конец этого файла два числа. Сначала количество поддиректориев в каталоге /etc, а затем количество скрытых файлов в каталоге /etc.
 ls /etc/*/ --directory | wc --lines >> $LIST # use find here
 ls --almost-all /etc/ | grep '^\.' --count >> $LIST # also use find
 
+# Создать в каталоге test каталог links.
 mkdir --parent $LINKS
 
+# Создать в каталоге links жесткую ссылку на файл list с именем list_hlink.
 ln --force $LIST $LIST_HLINK
+# Создать в каталоге links символическую ссылку на файл list с именем list_slink.
 ln --force --symbolic $LIST $LIST_SLINK
+# Вывести на экран количество имен (жестких ссылок) файла list_hlink, количество имен (жестких ссылок) файла list и количество имен (жестких ссылок) файла list_slink.
 echo list_hlink: $(ls -l $LIST_HLINK | awk '{print $2}')
 echo list: $(ls -l $LIST | awk '{print $2}')
 echo list_slink: $(ls -l $LIST_SLINK | awk '{print $2}')
-read
 
+# Дописать в конец файла list_hlink число строк в файле list.
+read
 cat $LIST | wc --lines >> $LIST_HLINK # wc can use file
-diff $LIST_HLINK $LIST_SLINK && echo YES
-read
 
+# Сравнить содержимое файлов list_hlink и list_slink. Вывести на экран YES, если файлы идентичны.
+diff $LIST_HLINK $LIST_SLINK && echo YES
+
+# Переименовать файл list в list1.
 mv --force $LIST $LIST1
-diff $LIST_HLINK $LIST_SLINK && echo YES
-read
 
+# Сравнить содержимое файлов list_hlink и list_slink. Вывести на экран YES, если файлы идентичны.
+diff $LIST_HLINK $LIST_SLINK && echo YES
+
+# Создать в домашнем каталоге пользователя жесткую ссылку на каталог links.
 ln --force $LIST $LIST_HLINK2
+
+# Создать в домашнем каталоге файл list_conf, содержащий список файлов с расширением .conf, из каталога /etc и всех его подкаталогов.
 find /etc -name "*.conf" -type f > $LIST_CONF
+
+# Создать в домашнем каталоге файл list_d, содержащий список всех подкаталогов каталога /etc,расширение которых .d.
 find /etc -name "*.d" -type d > $LIST_D
+
+# Создать файл list_conf_d, включив в него последовательно содержимое list_conf и list_d.
 cat $LIST_CONF $LIST_D > $LIST_CONF_D
+
+# Создать в каталоге test скрытый каталог sub.
 mkdir --parent $SUB
+
+# Скопировать в него файл list_conf_d.
 cp $LIST_CONF_D $SUB
+
+# Еще раз скопировать туда же этот же файл в режиме автоматического создания резервной копии замещаемых файлов.
 cp -b $LIST_CONF_D $SUB
 
+# Создать в домашнем каталоге файл man.txt, содержащий документацию на команду man.
 man man > $MAN1
-split --bytes=1K --additional-suffix=$MAN_SPLITTED_SUFFIX $MAN1
-mkdir --parent $MAN_DIR
-mv ~/*"${MAN_SPLITTED_SUFFIX}" $MAN_DIR
-cat $MAN_DIR/*"${MAN_SPLITTED_SUFFIX}" > $MAN2
-diff $MAN1 $MAN2 && echo YES
-read
 
+# Разбить файл man.txt на несколько файлов, каждый из которых будет иметь размер не более 1килобайта.
+split --bytes=1K --additional-suffix=$MAN_SPLITTED_SUFFIX $MAN1
+
+# Создать каталоге test каталог man.dir.
+mkdir --parent $MAN_DIR
+
+# Переместить одной командой все файлы, полученные в пункте 21 в каталог man.dir.
+mv ~/*"${MAN_SPLITTED_SUFFIX}" $MAN_DIR
+
+# Собрать файлы в каталоге man.dir обратно в файл с именем man.txt.
+cat $MAN_DIR/*"${MAN_SPLITTED_SUFFIX}" > $MAN2
+
+# Сравнить файлы man.txt в домашней каталоге и в каталоге man.dir и вывести YES, если файлыидентичны.
+diff $MAN1 $MAN2 && echo YES
+
+# Добавить в файл man.txt, находящийся в домашнем каталоге несколько строчек с произвольными символами в начало файла и несколько строчек в конце файла.
+read
 echo -e "new-line1\nnew-line2\n$(cat $MAN1)" > $MAN1
 echo -e "\nnew-line3\nnew-line4" >> $MAN1
+
+# Одной командой получить разницу между файлами в отдельный файл в стандартном формате для наложения патчей.
 diff -u $MAN1 $MAN2 > $PATCH_DIFF
+# Переместить файл с разницей в каталог man.dir.
+# Наложить патч из файла с разницей на man.txt в каталоге man.dir.
 patch $MAN2 < $PATCH_DIFF
+# Сравнить файлы man.txt в домашней каталоге и в каталоге man.dir и вывести YES, если файлы идентичны.
 diff $MAN1 $MAN2 && echo YES
 read
